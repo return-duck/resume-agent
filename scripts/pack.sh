@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
-# 本机打包，生成可上传的 tar.gz（不含 node_modules / .env / data）
+# 本机打包当前代码（不含 node_modules / .env / data）
+# 用法:
+#   bash scripts/pack.sh          → tar.gz
+#   bash scripts/pack.sh --zip    → zip
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+FORMAT=tar
+if [ "${1:-}" = "--zip" ] || [ "${1:-}" = "zip" ]; then
+  FORMAT=zip
+fi
 
 NAME="resume-agent"
 VERSION="$(node -p "require('./package.json').version" 2>/dev/null || echo 1.0.0)"
 STAMP="$(date +%Y%m%d%H%M%S)"
 OUT_DIR="$ROOT/release"
 STAGE="$OUT_DIR/${NAME}-${VERSION}"
-ARCHIVE="$OUT_DIR/${NAME}-${VERSION}-${STAMP}.tar.gz"
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
-# 需要带上的内容（源码 + 锁文件 + 启动脚本；依赖在服务器 npm install）
 for item in \
   package.json \
   package-lock.json \
@@ -30,7 +36,6 @@ do
   fi
 done
 
-# 排除测试脚本里可能误带的本地路径即可；scripts 可保留 test:*
 mkdir -p "$STAGE/data/knowledge" "$STAGE/logs"
 printf '%s\n' \
   'node_modules/' \
@@ -39,21 +44,33 @@ printf '%s\n' \
   'logs/**' \
   > "$STAGE/.gitignore"
 
-# 确保 start.sh 可执行
 chmod +x "$STAGE/start.sh" 2>/dev/null || true
 
-tar -C "$OUT_DIR" -czf "$ARCHIVE" "${NAME}-${VERSION}"
-rm -rf "$STAGE"
+if [ "$FORMAT" = "zip" ]; then
+  ARCHIVE="$OUT_DIR/${NAME}-${VERSION}-${STAMP}.zip"
+  LATEST="$OUT_DIR/${NAME}-latest.zip"
+  (
+    cd "$OUT_DIR"
+    rm -f "$ARCHIVE"
+    zip -qry "$ARCHIVE" "${NAME}-${VERSION}"
+  )
+  EXTRACT_HINT="unzip ${NAME}-latest.zip && cd ${NAME}-${VERSION}"
+else
+  ARCHIVE="$OUT_DIR/${NAME}-${VERSION}-${STAMP}.tar.gz"
+  LATEST="$OUT_DIR/${NAME}-latest.tar.gz"
+  tar -C "$OUT_DIR" -czf "$ARCHIVE" "${NAME}-${VERSION}"
+  EXTRACT_HINT="tar -xzf ${NAME}-latest.tar.gz && cd ${NAME}-${VERSION}"
+fi
 
-# 同时生成一个固定名软链/拷贝，方便上传
-cp -f "$ARCHIVE" "$OUT_DIR/${NAME}-latest.tar.gz"
+rm -rf "$STAGE"
+cp -f "$ARCHIVE" "$LATEST"
 
 echo "打包完成:"
 echo "  $ARCHIVE"
-echo "  $OUT_DIR/${NAME}-latest.tar.gz"
+echo "  $LATEST"
 echo ""
 echo "上传后在服务器执行:"
-echo "  tar -xzf ${NAME}-latest.tar.gz && cd ${NAME}-${VERSION}"
+echo "  $EXTRACT_HINT"
 echo "  cp .env.example .env   # 填写 LLM_*"
 echo "  npm install"
 echo "  ./start.sh"

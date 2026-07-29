@@ -8,6 +8,7 @@
     "start": "node --import tsx src/index.ts",
     "dev": "node --watch --import tsx src/index.ts",
     "pack": "bash scripts/pack.sh",
+    "zip": "bash scripts/pack.sh --zip",
     "test:analyse": "node --import tsx scripts/test-analyse.ts",
     "test:chat": "node --import tsx scripts/test-chat.ts"
   },

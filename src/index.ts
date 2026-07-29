@@ -145,7 +145,13 @@ async function resolveMessageWithFile(req: express.Request): Promise<{
       fileName,
       contentType,
     );
-    const fileNote = `【用户上传文件 ${fileName}】\n${extracted.text}`;
+    // 过长正文易导致 MaaS 连接 Premature close；截断后仍保留主体经历
+    const maxChars = Number(process.env.ANALYSE_MAX_FILE_CHARS || 28000);
+    let text = extracted.text || '';
+    if (maxChars > 0 && text.length > maxChars) {
+      text = `${text.slice(0, maxChars)}\n\n[文本已截断，原文约 ${extracted.text.length} 字]`;
+    }
+    const fileNote = `【用户上传文件 ${fileName}】\n${text}`;
     message = message ? `${message}\n\n${fileNote}` : fileNote;
   }
 
