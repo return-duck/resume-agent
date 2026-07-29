@@ -6,7 +6,10 @@
   "description": "Resume Agent (Node.js + LangGraph)",
   "scripts": {
     "start": "node --import tsx src/index.ts",
-    "dev": "node --watch --import tsx src/index.ts"
+    "dev": "node --watch --import tsx src/index.ts",
+    "pack": "bash scripts/pack.sh",
+    "test:analyse": "node --import tsx scripts/test-analyse.ts",
+    "test:chat": "node --import tsx scripts/test-chat.ts"
   },
   "dependencies": {
     "@langchain/core": "^0.3.40",
@@ -14,13 +17,20 @@
     "@langchain/openai": "^0.4.4",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "mammoth": "^1.12.0",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5",
+    "tsx": "^4.19.3",
+    "uuid": "^14.0.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.13.10",
-    "tsx": "^4.19.3",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.8.2"
   }
 }
