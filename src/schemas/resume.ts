@@ -47,6 +47,8 @@ export const CompanySchema = z.object({
   startDate: z.string().default(''),
   endDate: z.string().default(''),
   sortOrder: z.number().optional(),
+  /** 工作经历要点，与项目 description（简介）分离 */
+  highlights: z.array(ProjectWorkSchema).default([]),
   projects: z.array(ProjectSchema).default([]),
 });
 
