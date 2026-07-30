@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# 本机打包当前代码（不含 node_modules / .env / data）
+# 仅打包源码与清单文件，不包含 node_modules / .env / data / logs / release
+# 服务器上再执行: npm install && ./start.sh
+#
 # 用法:
-#   bash scripts/pack.sh          → tar.gz
-#   bash scripts/pack.sh --zip    → zip
+#   bash scripts/pack.sh          → resume-agent.tar.gz
+#   bash scripts/pack.sh --zip    → resume-agent.zip
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -13,14 +15,13 @@ if [ "${1:-}" = "--zip" ] || [ "${1:-}" = "zip" ]; then
 fi
 
 NAME="resume-agent"
-VERSION="$(node -p "require('./package.json').version" 2>/dev/null || echo 1.0.0)"
-STAMP="$(date +%Y%m%d%H%M%S)"
 OUT_DIR="$ROOT/release"
-STAGE="$OUT_DIR/${NAME}-${VERSION}"
+STAGE="$OUT_DIR/$NAME"
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
+# 只拷贝运行所需源码与配置模板（绝不打包 node_modules）
 for item in \
   package.json \
   package-lock.json \
@@ -29,6 +30,7 @@ for item in \
   start.sh \
   README.md \
   src \
+  bin \
   scripts
 do
   if [ -e "$ROOT/$item" ]; then
@@ -36,41 +38,30 @@ do
   fi
 done
 
-mkdir -p "$STAGE/data/knowledge" "$STAGE/logs"
-printf '%s\n' \
-  'node_modules/' \
-  '.env' \
-  'data/**' \
-  'logs/**' \
-  > "$STAGE/.gitignore"
-
-chmod +x "$STAGE/start.sh" 2>/dev/null || true
+chmod +x "$STAGE/start.sh" "$STAGE/bin/resume-agent" "$STAGE/scripts/pack.sh" 2>/dev/null || true
 
 if [ "$FORMAT" = "zip" ]; then
-  ARCHIVE="$OUT_DIR/${NAME}-${VERSION}-${STAMP}.zip"
-  LATEST="$OUT_DIR/${NAME}-latest.zip"
+  ARCHIVE="$OUT_DIR/${NAME}.zip"
   (
     cd "$OUT_DIR"
     rm -f "$ARCHIVE"
-    zip -qry "$ARCHIVE" "${NAME}-${VERSION}"
+    zip -qry "$ARCHIVE" "$NAME"
   )
-  EXTRACT_HINT="unzip ${NAME}-latest.zip && cd ${NAME}-${VERSION}"
+  EXTRACT_HINT="unzip ${NAME}.zip && cd ${NAME}"
 else
-  ARCHIVE="$OUT_DIR/${NAME}-${VERSION}-${STAMP}.tar.gz"
-  LATEST="$OUT_DIR/${NAME}-latest.tar.gz"
-  tar -C "$OUT_DIR" -czf "$ARCHIVE" "${NAME}-${VERSION}"
-  EXTRACT_HINT="tar -xzf ${NAME}-latest.tar.gz && cd ${NAME}-${VERSION}"
+  ARCHIVE="$OUT_DIR/${NAME}.tar.gz"
+  rm -f "$ARCHIVE"
+  tar -C "$OUT_DIR" -czf "$ARCHIVE" "$NAME"
+  EXTRACT_HINT="tar -xzf ${NAME}.tar.gz && cd ${NAME}"
 fi
 
 rm -rf "$STAGE"
-cp -f "$ARCHIVE" "$LATEST"
 
-echo "打包完成:"
+echo "打包完成（仅源码，不含 node_modules）:"
 echo "  $ARCHIVE"
-echo "  $LATEST"
 echo ""
 echo "上传后在服务器执行:"
 echo "  $EXTRACT_HINT"
-echo "  cp .env.example .env   # 填写 LLM_*"
+echo "  cp .env.example ../.env   # 放在上一级目录并填写 LLM_*"
 echo "  npm install"
 echo "  ./start.sh"

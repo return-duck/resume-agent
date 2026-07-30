@@ -2,7 +2,17 @@ import { HumanMessage, type BaseMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { createChatModel } from '../llm.js';
-import { AgentTraceCallback, agentLog } from '../logging/agentCallbacks.js';
+import {
+  AgentTraceCallback,
+  beginRunClock,
+  elapsedSuffix,
+  endRunClock,
+  formatTokens,
+  nowMs,
+  printNodeSummary,
+  runNode,
+} from '../logging/agentCallbacks.js';
+import { clog } from '../logging/logger.js';
 import { createReadKnowledgeTools } from '../tools/readKnowledge.js';
 
 const checkpointer = new MemorySaver();
@@ -61,29 +71,44 @@ function lastAiText(messages: BaseMessage[]): string {
 export async function runChat(input: ChatInput): Promise<ChatResult> {
   const agent = getAgent(input.knowledgeId);
   const tracer = new AgentTraceCallback();
-  agentLog(
-    'chat.begin',
-    `threadId=${input.threadId} knowledgeId=${input.knowledgeId ?? ''}`,
-  );
+  const chatStarted = nowMs();
+  beginRunClock('chat');
+  try {
+    clog(
+      'chat',
+      `begin threadId=${input.threadId} knowledgeId=${input.knowledgeId ?? ''}`,
+    );
 
-  const result = await agent.invoke(
-    { messages: [new HumanMessage(input.message)] },
-    {
-      configurable: { thread_id: input.threadId },
-      callbacks: [tracer],
-    },
-  );
+    const result = await runNode(
+      {
+        name: 'chat_react',
+        kind: 'react',
+        desc: '多轮对话 ReAct Agent（可调用 read_knowledge / list_knowledge）',
+      },
+      () =>
+        agent.invoke(
+          { messages: [new HumanMessage(input.message)] },
+          {
+            configurable: { thread_id: input.threadId },
+            callbacks: [tracer],
+          },
+        ),
+    );
 
-  const msgs = result.messages as BaseMessage[];
-  const reply = lastAiText(msgs);
-  agentLog(
-    'chat.end',
-    `threadId=${input.threadId} replyChars=${reply.length}`,
-  );
+    const msgs = result.messages as BaseMessage[];
+    const reply = lastAiText(msgs);
+    printNodeSummary('chat', Date.now() - chatStarted);
+    clog(
+      'chat',
+      `end threadId=${input.threadId} replyChars=${reply.length} ${elapsedSuffix(chatStarted)} ${formatTokens(tracer.getTokenUsage())}`,
+    );
 
-  return {
-    threadId: input.threadId,
-    knowledgeId: input.knowledgeId,
-    reply,
-  };
+    return {
+      threadId: input.threadId,
+      knowledgeId: input.knowledgeId,
+      reply,
+    };
+  } finally {
+    endRunClock();
+  }
 }

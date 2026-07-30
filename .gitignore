@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+bench/
 .env
 .DS_Store
 *.log

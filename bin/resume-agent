@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# resume-agent CLI 入口
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec node --import tsx "$ROOT/src/cli.ts" "$@"

@@ -6,13 +6,18 @@ cd "$ROOT"
 
 export PATH="${PATH}:$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" 2>/dev/null | tail -1)/bin"
 
-if [ ! -f .env ]; then
-  echo "缺少 .env，请先: cp .env.example .env 并填写 LLM_*"
+if [ ! -f ../.env ]; then
+  echo "缺少 ../.env，请先在上一级目录: cp resume-agent/.env.example .env 并填写 LLM_*"
   exit 1
 fi
 
 if ! command -v node >/dev/null 2>&1; then
   echo "未找到 node，请先安装 Node.js 18+"
+  exit 1
+fi
+
+if [ ! -d node_modules ]; then
+  echo "缺少 node_modules，请先执行: npm install"
   exit 1
 fi
 

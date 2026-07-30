@@ -4,37 +4,15 @@ import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import { runAnalyse } from './graphs/analyse.js';
+import { runAnalyse, runAnalyseReact } from './graphs/analyse.js';
 import { runChat } from './graphs/chatAgent.js';
 import {
   getKnowledgeDir,
   loadKnowledgeFromDisk,
 } from './knowledge/store.js';
+import { loadEnvFile } from './loadEnv.js';
 import { extractTextFromBuffer } from './parsers/document.js';
 import { ResumeSchema } from './schemas/resume.js';
-
-function loadEnvFile() {
-  const envPath = resolve(process.cwd(), '.env');
-  if (!existsSync(envPath)) return;
-  const text = readFileSync(envPath, 'utf8');
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq <= 0) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
 
 loadEnvFile();
 
@@ -158,10 +136,11 @@ async function resolveMessageWithFile(req: express.Request): Promise<{
   return { message, knowledgeId, resume };
 }
 
-/**
- * 简历分析入口：内部可 ReAct；对外只返回 { requestId, knowledgeId?, resume }。
- */
-app.post('/v1/analyse', upload.single('file'), async (req, res) => {
+async function handleAnalyse(
+  req: express.Request,
+  res: express.Response,
+  mode: 'oneshot' | 'react',
+) {
   try {
     const requestId = String(
       req.body?.requestId || req.body?.threadId || randomUUID(),
@@ -171,7 +150,7 @@ app.post('/v1/analyse', upload.single('file'), async (req, res) => {
       res.status(400).json({ message: 'message 不能为空（或上传文件）' });
       return;
     }
-    const result = await runAnalyse({
+    const payload = {
       message:
         message.includes('【分析') || message.includes('Resume')
           ? message
@@ -179,19 +158,40 @@ app.post('/v1/analyse', upload.single('file'), async (req, res) => {
       knowledgeId,
       resume,
       requestId,
-    });
+    };
+    const result =
+      mode === 'react'
+        ? await runAnalyseReact(payload)
+        : await runAnalyse(payload);
     // 不返回 messages / toolResults
     res.json({
       requestId: result.requestId,
       knowledgeId: result.knowledgeId,
       resume: result.resume,
+      mode: result.mode,
     });
   } catch (err) {
     res.status(500).json({
       message: err instanceof Error ? err.message : String(err),
     });
   }
-});
+}
+
+/**
+ * 简历分析入口：extract → 并行 refine(单次 LLM) → merge。
+ * 对外只返回 { requestId, knowledgeId?, resume, mode }。
+ */
+app.post('/v1/analyse', upload.single('file'), (req, res) =>
+  handleAnalyse(req, res, 'oneshot'),
+);
+
+/**
+ * 简历分析 ReAct 入口：顺序与 /v1/analyse 相同，
+ * refine_* 使用 createReactAgent（可调 tools）。
+ */
+app.post('/v1/analyse-react', upload.single('file'), (req, res) =>
+  handleAnalyse(req, res, 'react'),
+);
 
 /**
  * 多轮对话入口（自然语言回复，非简历分析主入口）。
@@ -216,5 +216,7 @@ app.post('/v1/chat', upload.single('file'), async (req, res) => {
 
 app.listen(port, () => {
   console.log(`[agent] listening on http://localhost:${port}`);
-  console.log(`[agent] API: GET /health , POST /v1/analyse , POST /v1/chat`);
+  console.log(
+    `[agent] API: GET /health , POST /v1/analyse , POST /v1/analyse-react , POST /v1/chat`,
+  );
 });

@@ -4,13 +4,18 @@
   "private": true,
   "type": "module",
   "description": "Resume Agent (Node.js + LangGraph)",
+  "bin": {
+    "resume-agent": "bin/resume-agent"
+  },
   "scripts": {
-    "start": "node --import tsx src/index.ts",
+    "cli": "node --import tsx src/cli.ts",
+    "start": "node --import tsx src/cli.ts start",
     "dev": "node --watch --import tsx src/index.ts",
-    "pack": "bash scripts/pack.sh",
-    "zip": "bash scripts/pack.sh --zip",
+    "pack": "node --import tsx src/cli.ts pack",
+    "zip": "node --import tsx src/cli.ts pack --zip",
     "test:analyse": "node --import tsx scripts/test-analyse.ts",
-    "test:chat": "node --import tsx scripts/test-chat.ts"
+    "test:chat": "node --import tsx scripts/test-chat.ts",
+    "bench:analyse": "node --import tsx scripts/bench-analyse-compare.ts"
   },
   "dependencies": {
     "@langchain/core": "^0.3.40",

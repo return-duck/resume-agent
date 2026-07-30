@@ -36,7 +36,32 @@ async function withLlmRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   throw lastErr;
 }
 
-export function createChatModel() {
+export type CreateChatModelOptions = {
+  /**
+   * 显式开关思考链（Qwen3 / 兼容网关常用 enable_thinking）。
+   * undefined = 不传该字段（走服务商默认）；也可用环境变量 LLM_ENABLE_THINKING=0/1。
+   * 注意：部分预览模型（如 qwen3.*-preview）会强制 enable_thinking=true，传 false 会 400。
+   */
+  enableThinking?: boolean;
+};
+
+function resolveEnableThinking(
+  opts?: CreateChatModelOptions,
+): boolean | undefined {
+  if (opts && 'enableThinking' in opts && opts.enableThinking !== undefined) {
+    return opts.enableThinking;
+  }
+  const raw = env('LLM_ENABLE_THINKING')?.toLowerCase();
+  if (raw === '0' || raw === 'false' || raw === 'off' || raw === 'no') {
+    return false;
+  }
+  if (raw === '1' || raw === 'true' || raw === 'on' || raw === 'yes') {
+    return true;
+  }
+  return undefined;
+}
+
+export function createChatModel(opts?: CreateChatModelOptions) {
   const apiKey = env('LLM_API_KEY', 'OPENAI_API_KEY');
   if (!apiKey) {
     throw new Error('缺少环境变量 LLM_API_KEY 或 OPENAI_API_KEY');
@@ -50,12 +75,20 @@ export function createChatModel() {
   const maxRetries =
     maxRetriesRaw && Number(maxRetriesRaw) >= 0 ? Number(maxRetriesRaw) : 3;
 
+  const enableThinking = resolveEnableThinking(opts);
+  const modelKwargs: Record<string, unknown> = {};
+  if (enableThinking !== undefined) {
+    // OpenAI 兼容网关（含阿里云 MaaS / DashScope）常见字段
+    modelKwargs.enable_thinking = enableThinking;
+  }
+
   const model = new ChatOpenAI({
     apiKey,
     model: env('LLM_MODEL', 'OPENAI_MODEL') || 'gpt-4o-mini',
     temperature: 0.2,
     timeout,
     maxRetries,
+    ...(Object.keys(modelKwargs).length ? { modelKwargs } : {}),
     configuration: {
       baseURL: env('LLM_BASE_URL', 'OPENAI_BASE_URL'),
     },
