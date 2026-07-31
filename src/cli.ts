@@ -4,7 +4,7 @@
  *   npm run cli -- start
  *   npm run cli -- analyse --file=./resume.pdf
  *   npm run cli -- chat
- *   npm run cli -- pack [--zip]
+ *   npm run cli -- pack
  *   npx resume-agent <command>
  */
 import { spawn } from 'node:child_process';
@@ -37,7 +37,7 @@ function printHelp() {
                         同上顺序，refine 用 ReAct + tools
   chat [options] [message]
                         多轮对话；无 message 时进入交互模式
-  pack [--zip]          打包源码（不含 node_modules）
+  pack                  打包源码为 tar.gz（不含 node_modules）
   help                  显示帮助
 
 analyse / analyse-react 选项:
@@ -55,7 +55,7 @@ chat 选项:
   npm run cli -- analyse --file=./a.pdf
   npm run cli -- analyse-react --file=./a.pdf
   npm run cli -- chat --threadId=t1 你好
-  npm run cli -- pack --zip
+  npm run pack
 `);
 }
 
@@ -64,9 +64,7 @@ function takeFlags(argv: string[]) {
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i += 1) {
     const raw = argv[i];
-    if (raw === '--zip') {
-      flags.zip = true;
-    } else if (raw === '--help' || raw === '-h') {
+    if (raw === '--help' || raw === '-h') {
       flags.help = true;
     } else if (raw.startsWith('--') && raw.includes('=')) {
       const eq = raw.indexOf('=');
@@ -244,11 +242,9 @@ async function cmdChat(argv: string[]) {
   }
 }
 
-function cmdPack(argv: string[]) {
-  const zip = argv.includes('--zip') || argv.includes('zip');
+function cmdPack() {
   const script = resolve(ROOT, 'scripts/pack.sh');
-  const args = zip ? ['--zip'] : [];
-  const child = spawn('bash', [script, ...args], {
+  const child = spawn('bash', [script], {
     cwd: ROOT,
     stdio: 'inherit',
   });
@@ -279,7 +275,7 @@ async function main() {
       await cmdChat(rest);
       break;
     case 'pack':
-      cmdPack(rest);
+      cmdPack();
       break;
     default:
       console.error(`未知命令: ${cmd}\n`);

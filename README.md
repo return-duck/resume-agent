@@ -21,7 +21,7 @@ npm run cli -- start                          # 启动 HTTP 服务
 npm run cli -- analyse --file=./resume.pdf    # 并行单次 LLM
 npm run cli -- analyse-react --file=./a.pdf   # 同序 ReAct
 npm run cli -- chat                           # 交互对话
-npm run cli -- pack --zip                     # 打包源码
+npm run pack                                  # 打包源码 → release/resume-agent.tar.gz
 ```
 
 也可：`npx resume-agent <command>` / `./bin/resume-agent <command>`
